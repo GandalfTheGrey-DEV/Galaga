@@ -12,7 +12,7 @@ Galaga Rust Game is a fast-paced space shooter inspired by the iconic *Galaga*. 
 Dodge incoming alien waves, blast enemies, and aim for the high score!
 
 ### Features:
--- terminal game🤣
+-- terminal game 🤣
 
 ---
 
@@ -21,3 +21,10 @@ Dodge incoming alien waves, blast enemies, and aim for the high score!
 ### Prerequisites:
 - Install [Rust](https://www.rust-lang.org/tools/install).
 - Ensure you have `cargo` (Rust's package manager).
+
+---
+
+## 📜 License
+
+This project is licensed under the [Bear in Antarctica License (BIA License)](./LICENSE.md).  
+Use the code responsibly or face the consequences! 

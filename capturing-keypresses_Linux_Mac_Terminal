@@ -1,0 +1,37 @@
+use std::io::{self, Read};
+use std::os::unix::io::AsRawFd;
+use termios::*;
+
+fn main() {
+    let mut stdin = io::stdin();
+    let fd = stdin.as_raw_fd();
+
+    // Save the current terminal settings
+    let mut original_termios = Termios::from_fd(fd).expect("Failed to get terminal settings");
+    let mut raw_termios = original_termios.clone();
+
+    // Set the terminal to raw mode
+    raw_termios.c_lflag &= !(ECHO | ICANON); // Disable echo and canonical mode
+    tcsetattr(fd, TCSANOW, &raw_termios).expect("Failed to set terminal to raw mode");
+
+    println!("Press the Left or Right arrow keys. Press 'q' to quit.");
+
+    let mut buffer = [0; 3]; 
+
+    loop {
+        let n = stdin.read(&mut buffer).expect("Failed to read input");
+        if n > 0 {
+            match buffer {
+                [27, 91, 68] => println!("Left arrow key pressed"), 
+                [27, 91, 67] => println!("Right arrow key pressed"), 
+                [b'q', ..] => {
+                    println!("Exiting...");
+                    break;
+                }
+                _ => println!("Other key pressed: {:?}", buffer),
+            }
+        }
+    }
+    // Set back to orginal settings
+    tcsetattr(fd, TCSANOW, &original_termios).expect("Failed to restore terminal settings");
+}

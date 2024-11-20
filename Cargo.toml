@@ -1,0 +1,11 @@
+[package]
+name = "galga"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crossterm = "0.28.1"
+ran = "2.0.1"
+rand = "0.8.5"
+termion = "4.0.3"
+uuid = "1.11.0"

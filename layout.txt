@@ -1,0 +1,9 @@
+imports
+consts
+type aliases
+traits
+structs
+    impl
+    impl _ for struct
+
+mainfn

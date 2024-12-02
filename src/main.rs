@@ -19,9 +19,6 @@ enum GameAction {
     Move(Cords, Cords),
 }
 
-
-//Given ship Action and cords create self
-
 #[derive(Clone)]
 enum ShipAction {
     Nothing,
@@ -30,11 +27,8 @@ enum ShipAction {
     RelativeMove((i8, i8)),
 }
 
-//TODO: What are cords used for
-//TODO: Why are they used togother cords and gameaction
 
 impl ShipAction {
-    //todo: pass to_game_action the correct varibels
     pub fn to_game_action(self, ship: &Ship, cords: Cords) -> (Option<Cords>, Option<GameAction>) {
         match self {
             ShipAction::Remove => (None, None),
@@ -65,14 +59,12 @@ impl ShipAction {
     }
 }
 
-//Needs cords to create game action
 #[derive(Clone)]
 enum AIAction {
     Nothing,
     Remove,
     Shoot,
     RelativeMove((i8, i8)),
-    //ShootOrMove, 
 }
 impl AIAction {
     pub fn to_ship_action(self, cords: Cords, game_board: &HashMap<Cords, Ship>) -> ShipAction {
@@ -84,7 +76,6 @@ impl AIAction {
         }
     }
 }
-//Needs cords and game_board to create ship actions
 
 enum Ship {
     Fly(ShipAI, bool, Uuid),
@@ -205,8 +196,6 @@ impl ShipAI {
         }
     }
 
-    // ship ai needs to return a Vec of actions because we remove the ship and then add it back after we add the second action
-    // Return a game action by running shipaction.to_game_action(cords)
     fn get_ai_action(&mut self, _cords: Cords, _game_board: &HashMap<Cords, Ship>) -> AIAction {
         if self.actions.is_empty() {
             return AIAction::Nothing;

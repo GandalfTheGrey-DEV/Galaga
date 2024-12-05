@@ -1,0 +1,42 @@
+main.rs
+└── imports from → game_state.rs (GameState)
+    ├── imports from → ship.rs (Ship)
+    | └-- imports 
+    ├── imports from → key_detection.rs (KeyReader)
+    ├── imports from → player.rs (Player)
+    ├── imports from → ship_ai.rs (Timer)
+    ├── imports from → ship_action.rs (ShipAction)
+    └── imports from → AI_action.rs (AIAction)
+
+game_state.rs
+├── imports from → ship.rs (Ship)
+├── imports from → key_detection.rs (KeyReader)
+├── imports from → player.rs (Player)
+├── imports from → ship_ai.rs (Timer)
+├── imports from → ship_action.rs (ShipAction)
+└── imports from → AI_action.rs (AIAction)
+
+ship.rs
+├── imports from → ship_ai.rs (ShipAI)
+├── imports from → ship_action.rs (ShipAction)
+└── imports from → AI_action.rs (AIAction)
+
+ship_ai.rs
+├── imports from → game_state.rs (Cords, ROWS, COLUMNS)
+└── imports from → ship.rs (Ship)
+
+player.rs
+├── imports from → game_state.rs (Cords)
+└── imports from → ship.rs (Ship)
+
+ship_action.rs
+└── imports from → ship.rs (Ship)
+└── imports from → game_state.rs (Cords)
+
+AI_action.rs
+└── imports from → ship.rs (Ship)
+└── imports from → game_state.rs (Cords)
+
+key_detection.rs
+└── imports from → console (Key, Term)
+

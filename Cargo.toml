@@ -1,0 +1,18 @@
+[package]
+name = "galaga"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+console = "0.15.8"
+crossterm = "0.28.1"
+libc = "0.2.164"
+ran = "2.0.1"
+rand = "0.8.5"
+termion = "4.0.3"
+termios = "0.3.3"
+tokio = {version="1.41.1", features=["macros", "rt-multi-thread"]}
+uuid = {version="1.11.0", features=["v4"]}
+

@@ -1,0 +1,80 @@
+#GALAGA
+1. Need a structure to hold the game state: Options were Vec<Vec<Ship>>, HashMap<Cord, Ship>
+    1. Dose not store unnecssary data
+    2. Easy to manipulte for our purposes, this includes adding and removing(Moving) a Ship
+    3. Easy to display
+2. Methods of the game state
+    1. Print the game
+    2. Move Ships
+        1. Takes the new cords and the old cords as inputs
+        2. Removes the ship from the old cords and "Adds" it with the new cords
+    3. Remove Ships
+        1. The Cords of the ship to remove as inputs
+        2. Remves the ship from the hashmap
+    4. Add Ships
+        1. A ship and its Cords are it inputs
+        2. Insert the ship and cords into the hashmap
+        3. If a ship exists at the cords your attempting to insert it at:
+            1. Remove both ships
+            2. Add the Explosion ship to the cords
+            3. Run the collision Method
+    5. Collision
+        1. Takes into two ships that collided and print the ships that collided
+    6. AutoMoveShips 
+        1. Loop through all the ships running the update position function
+        2. Then handles the ship action that is returned
+2. A Ship is a trait that the Player, Flys and Bullet impliments
+    1. All ships have a display character
+    2. All ships have an update method that accepts its current cords and returns A ship action
+
+2. The Explosion is an object stored in the gamestate
+    1. The display char '*'
+
+3. The player is an object is stored in the gamestate
+    1. The display char 'P'
+
+4. The Fly is an object that is stored in the gamestate
+    2. Needs the display char 'F'
+
+5. The Bullet is an object that is stored in the gamestate
+    1. Display char '|'
+
+6. KeyReader is an object that is used to read keys from the console
+    Fields:
+        1. It has a field for a join handle, this is the handle for the task created by the first method
+    Constructors:
+        1. new: construtor creates the KeyReader and sets the field to the task of reading the key(first method)
+    Methods:
+        1. await_key_press: It has an async method that uses the console crate to read a keys
+        2. read_key: It has a method that checks for a key and returns an Option<Key> If key was found restart the task in prep for next read
+7. Enum ShipAction Can be Nothing, Remove, Move(Cords)
+    1. Nothing does nothing next ship
+    2. Remove remove the ship
+    3. Move(Cords) move the ship to the new cords provided
+8. Timing structure
+    1. Has new constructor which accepts update interval
+    1. Has two fields current time inactive and action interval
+    2. Has tick method which updates the current time inactive and returns a bool on weather to take action
+
+#Style Restrictions
+1. Never write a function thats more than 10-15 lines long
+2. Never accept mutable paramaters in a function with the exception of &mut self
+3. Never write a function that is not a Method
+4. Never write a struct that has more than 5 fields
+5. Originize your code:
+    1. Imports(use statemnts)
+    2. Const/Static statements
+    2. Type aliases
+    3. Traits
+    4. Structure definitions
+        3. impl Structure
+        4. impl Trait for Structure
+    5. Main Function
+6. Never have any warnings after running cargo clippy
+7. Write a comment above every function describing what its inputs are and what its outputs are and why it exists in english
+8. Object cannot access methods that are above them
+
+
+Update 
+
+

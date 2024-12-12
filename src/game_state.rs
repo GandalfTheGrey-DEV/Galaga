@@ -1,5 +1,5 @@
 use crate::ship::Ship;
-use crate::structs::{Cords, COLUMNS, ROWS};
+use crate::structs::{Cords, COLUMNS, ROWS, Level, GameLevel};
 use crossterm::execute;
 use std::collections::HashMap;
 use std::process::exit;
@@ -15,19 +15,30 @@ pub struct GameState {
     pub game_board: HashMap<Cords, Ship>,
     pub tick_count: u32,
     pub player: Player,
+    pub gamelevel: GameLevel,
 }
 
 impl GameState {
     pub fn new() -> GameState {
+        let game_level = GameLevel::new(Level::Easy); 
+        let level_status = game_level.get_level_status(); 
+        
         GameState {
             game_board: HashMap::new(),
             tick_count: 0,
-            player: Player::new(),
+            player: Player::new(level_status.1), 
+            gamelevel: game_level,
         }
     }
 
     pub fn display_board(&self) {
         execute!(std::io::stdout(), crossterm::cursor::MoveTo(0, 0));
+        println!("            ██████  ███████ ██████");
+        println!("           ██       ██      ██   ██");
+        println!("           ██   ███ ███████ ██████");
+        println!("           ██    ██      ██ ██");
+        println!("            ██████  ███████ ██");
+    
         print!("           +");
         for _ in 0..COLUMNS {
             print!("-");
@@ -38,7 +49,7 @@ impl GameState {
             print!("           |");
             for col in 0..COLUMNS {
                 let position = Cords(row, col);
-
+    
                 if row == ROWS - 1 && col < (self.player.lives -1 as u8).into() {
                     print!("{}", self.player.display_char);
                 } else if self.player.current_position == Some(position) {
@@ -58,6 +69,8 @@ impl GameState {
         }
         println!("+           ");
     }
+
+    
 
     pub fn add_ship(&mut self, cords: Cords, ship: Ship) -> Result<(), String> {
         if cords.0 >= ROWS || cords.1 >= COLUMNS {
@@ -111,6 +124,9 @@ impl GameState {
         Ok(())
     }
 
+
+    
+
     pub async fn player_actions(&mut self) {
         if let Some(player_pos) = self.player.current_position {
             if self.game_board.get(&player_pos).is_some() {
@@ -137,12 +153,10 @@ impl GameState {
         loop {
             thread::sleep(Duration::from_millis(10));
             self.tick_count += 1;
-
             self.ship_actions()?;
             self.player_actions().await;
-
-
             self.display_board();
         }
     }
 }
+

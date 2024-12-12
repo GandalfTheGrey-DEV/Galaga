@@ -78,3 +78,21 @@
 Update 
 
 
+
+
+Example Flow
+Consider the following scenario:
+
+The ship is at Cords(0, 0), and the ShipAI has the actions:
+
+Move(Cords(1, 0)) (Move right)
+Shoot (Shoot if no ships are below)
+Move(Cords(0, -1)) (Move up)
+The AI will:
+
+Move right to Cords(1, 0).
+Check if there are any ships below it (Cords(1, 1)). If there are, it won't shoot; if not, it will shoot.
+Move up to Cords(0, -1).
+Repeat from the beginning of the action list.
+Conclusion
+ShipAI is designed to give each ship in the game its own intelligent behavior, making decisions on when and how to move or attack. It evaluates conditions like the presence of other ships and uses a timer to regulate how often it can take actions. By managing a list of actions and conditions, it creates dynamic behavior for the ship in the game world.

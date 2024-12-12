@@ -8,6 +8,55 @@ pub struct Cords(pub usize, pub usize);
 #[derive(Clone, Debug)]
 pub struct RelCords(pub i32, pub i32);
 
+#[derive(Clone, Debug)]
+pub enum Level {
+    Easy,
+    Medium,
+    Hard,
+}
+
+#[derive(Debug)]
+pub struct GameLevel {
+    current_level: Level,
+}
+
+impl GameLevel {
+    pub fn new(level: Level) -> Self {
+        GameLevel { current_level: level }
+    }
+
+    pub fn set_level(&mut self, level: Level) {
+        self.current_level = level;
+    }
+
+    pub fn get_level_status(&self) -> (u64, u8) {
+        match self.current_level {
+            Level::Easy => Self::easy(),
+            Level::Medium => Self::medium(),
+            Level::Hard => Self::hard(),
+        }
+    }
+
+    fn easy() -> (u64, u8) {
+        let speed = 500; 
+        let lives = 5;
+        (speed, lives)
+    }
+
+    fn medium() -> (u64, u8) {
+        let speed = 300;
+        let lives = 3;
+        (speed, lives)
+    }
+
+    fn hard() -> (u64, u8) {
+        let speed = 100; 
+        let lives = 1;
+        (speed, lives)
+    }
+}
+
+
 impl RelCords {
     pub fn evaluate(&self, cords: Cords) -> (Cords, bool) {
         

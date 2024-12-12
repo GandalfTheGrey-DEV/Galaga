@@ -14,11 +14,11 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new() -> Self {
+    pub fn new(lives: u8) -> Self { 
         let start_position = Cords(ROWS - 2, COLUMNS / 2);
         Player {
             display_char: '^', 
-            lives: 4,
+            lives,
             current_position: Some(start_position),
             start_position,
             death_timer: Timer::new(200),
@@ -64,11 +64,9 @@ impl Player {
         }
     }
 
-    pub fn respawn(&mut self, can_respawn: bool) {
+    pub fn respawn(&mut self, _can_respawn: bool) {
         if self.current_position.is_none() && self.death_timer.tick() {
-            if can_respawn {
-                self.move_to(self.start_position);
-            }
+            self.move_to(self.start_position);
         }
     }
 }
@@ -99,3 +97,4 @@ impl KeyReader {
         }
     }
 }
+

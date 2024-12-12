@@ -1,7 +1,9 @@
 use uuid::Uuid;
 use std::collections::HashMap;
 use crate::structs::{Cords, Timer, ShipAction, RelCords};
-
+       // pramitor game_level: &GameLevel
+       // let (speed, _lives) = game_level.get_level_status(); 
+//TOD
 pub enum Ship {
     Fly(ShipAI, bool, Uuid),
     Explosion(ShipAI, bool, Uuid),
@@ -42,31 +44,29 @@ impl Ship {
     }
 
     pub fn new_fly() -> Self {
-            Self::Fly(
-             ShipAI::new(
-                100, 
+        Self::Fly(
+            ShipAI::new(
+                100,
                 vec![
-                    AIAction::MoveOrNothing(RelCords(1, -1)),
-                    AIAction::ShootOrNothing,
-                    AIAction::MoveOrNothing(RelCords(-1, -1)),
-                    AIAction::ShootOrNothing,
-                    //Move Down Left
-                    //Shoot if clear or move Left
-                    //Move Up Left
-                    //Shoot if clear or move Left
-                ]
-            ), 
-            true, 
+                    (None, AIAction::MoveOrNothing(RelCords(1, 0))),                         
+                    (None, AIAction::MoveOrNothing(RelCords(0, -1))), 
+                    (None, AIAction::MoveOrNothing(RelCords(-1, 0))), 
+                    //TODO✅ make sure that the first thing in the touple has to be true befor it shoots 
+                    //TODO remove rel cords. 
+                    (Some(Condition::DontShootIfShipsAreBelow(RelCords(1, 0))), AIAction::Shoot),
+                ],
+            ),
+            true,
             Uuid::new_v4(),
         )
     }
-    
+
     pub fn new_bullet(moving_down: bool) -> Self {
         let movement = if moving_down { RelCords(1, 0) } else { RelCords(-1, 0) };
         Self::Bullet(
             ShipAI::new(
                 10, 
-                vec![AIAction::RelativeMove(movement)]
+                vec![(None, AIAction::RelativeMove(movement))],
             ), 
             false, 
             Uuid::new_v4(),
@@ -77,7 +77,7 @@ impl Ship {
         Self::Explosion(
             ShipAI::new(
                 10, 
-                vec![AIAction::Remove]
+                vec![(None, AIAction::Remove)],
             ), 
             false, 
             Uuid::new_v4(),
@@ -88,12 +88,12 @@ impl Ship {
 
 pub struct ShipAI {
     pub timer: Timer,
-    pub actions: Vec<AIAction>,
+    pub actions: Vec<(Option<Condition>, AIAction)>,
     pub action_index: usize,
 }
 
 impl ShipAI {
-    pub fn new(action_interval: u64, actions: Vec<AIAction>) -> Self {
+    pub fn new(action_interval: u64, actions: Vec<(Option<Condition>, AIAction)>) -> Self {
         ShipAI {
             timer: Timer::new(action_interval),
             actions,
@@ -101,21 +101,38 @@ impl ShipAI {
         }
     }
 
-    pub fn get_ai_action(&mut self) -> AIAction {
+    pub fn get_ai_action(&mut self, cords: Cords, game_board: &HashMap<Cords, Ship>) -> AIAction {
         if self.actions.is_empty() {
             return AIAction::Nothing;
         }
 
         if self.timer.tick() {
-            let action = self.actions[self.action_index].clone();
+            let (condition, action) = &self.actions[self.action_index];
+
+            if let Some(condition) = condition {
+                if !condition.evaluate(cords, game_board) {
+                    self.next_action();
+                    return self.get_ai_action(cords, game_board); 
+                }
+            }
+
             if self.action_index == self.actions.len() - 1 {
                 self.action_index = 0;
             } else {
                 self.action_index += 1;
             }
-            action
+
+            return action.clone(); 
+        }
+
+        AIAction::Nothing
+    }
+
+    fn next_action(&mut self) {
+        if self.action_index == self.actions.len() - 1 {
+            self.action_index = 0;
         } else {
-            AIAction::Nothing
+            self.action_index += 1;
         }
     }
 
@@ -124,31 +141,36 @@ impl ShipAI {
         cords: Cords,
         game_board: &HashMap<Cords, Ship>,
     ) -> ShipAction {
-        self.get_ai_action().to_ship_action(cords, game_board)
+        self.get_ai_action(cords, game_board).to_ship_action(cords, game_board)
     }
 }
+
+
 
 pub enum Condition {
     ShipExists(Cords),
     PositionAvailable(RelCords),
-    ShootPositionAvailable(RelCords),
+    DontShootIfShipsAreBelow(RelCords),
 }
 
 impl Condition {
     pub fn evaluate(&self, cords: Cords, game_board: &HashMap<Cords, Ship>) -> bool {
         match self {
             Condition::ShipExists(ref target_cords) => {
-                game_board.contains_key(target_cords) 
+                game_board.contains_key(target_cords)
             }
             Condition::PositionAvailable(rel_cords) => {
-                game_board.get(&rel_cords.evaluate(cords).0).is_none() 
+                game_board.get(&rel_cords.evaluate(cords).0).is_none()
             }
-            Condition::ShootPositionAvailable(rel_cords) => {
-                game_board.get(&rel_cords.evaluate(cords).0).is_none() 
-            }
+            Condition::DontShootIfShipsAreBelow(_) => {
+                let mut below_cords = cords;
+                below_cords.0 += 1; 
+
+    
         }
     }
 }
+
 
 
 #[derive(Clone)]
@@ -193,7 +215,7 @@ impl AIAction {
             }
 
             AIAction::ShootOrNothing => {
-                let condition = Condition::ShootPositionAvailable(RelCords(1, 0)); 
+                let condition = Condition::DontShootIfShipsAreBelow(RelCords(1, 0)); 
                 if condition.evaluate(cords, game_board) {
                     ShipAction::Shoot
                 } else {

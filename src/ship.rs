@@ -164,9 +164,20 @@ impl Condition {
             }
             Condition::DontShootIfShipsAreBelow(_) => {
                 let mut below_cords = cords;
-                below_cords.0 += 1; 
+                loop {
+                    if !game_board.contains_key(&below_cords) {
+                        break; 
+                    }
 
-    
+                    if let Some(ship) = game_board.get(&below_cords) {
+                        if let Ship::Fly(_, _, _) = ship {
+                            return false;
+                        }
+                    }
+                    below_cords.0 += 1;
+                }
+                true
+            }
         }
     }
 }
@@ -229,4 +240,5 @@ impl AIAction {
         }
     }
 }
+
 

@@ -3,6 +3,11 @@ use crate::structs::{ROWS, COLUMNS, Cords, Timer};
 use std::process::exit;
 use console::Term;
 
+use bevy::{
+    input::keyboard::KeyboardInput,
+    prelude::*,
+};
+
 
 pub struct Player {
     pub display_char: char,
@@ -40,13 +45,13 @@ impl Player {
                     }
                 }
                 Some(Key::ArrowUp) => {
-                    return Some(Cords(x - 1, y)); 
+                    return Some(Cords(x - 1, y));
                 }
                 Some(Key::CtrlC) => exit(0),
                 _ => {}
             };
         }
-        None 
+        None
     }
 
     pub fn move_to(&mut self, new_position: Cords) {
@@ -98,3 +103,48 @@ impl KeyReader {
     }
 }
 
+
+
+//TODO make the code below a copy of tE code above but dont change the key detction becuse its for bevy
+// pub fn handle_player_input(
+//     mut keyboard_input_events: EventReader<KeyboardInput>,
+//     mut player_position: ResMut<PlayerPosition>,
+//     mut query: Query<(&mut GridPosition, &mut Transform, &GameEntity), With<GameEntity>>,
+//     mut commands: Commands,
+//     color_palette: Res<ColorsPalette>,
+//     asset_server: Res<AssetServer>,
+// ) {
+//     let mut delta_x = 0;
+//     let mut delta_y = 0;
+//     let mut shoot = false;
+//
+//     // Process keyboard input
+//     for event in keyboard_input_events.read() {
+//         if let key_code = event.key_code {
+//             match key_code {
+//                 KeyCode::ArrowLeft => delta_x -= GRID_MOVE_DELTA,
+//                 KeyCode::ArrowRight => delta_x += GRID_MOVE_DELTA,
+//                 KeyCode::Space => shoot = true,
+//                 _ => {}
+//             }
+//         }
+//     }
+//
+//     // Update player position and transform
+//     for (mut grid_pos, mut transform, game_entity) in query.iter_mut() {
+//         if game_entity.entity_type == EntityType::Player {
+//             // Update the player's grid position
+//             grid_pos.x += delta_x;
+//             grid_pos.y += delta_y;
+//
+//             transform.translation = grid_to_world(&grid_pos);
+//
+//             player_position.0 = GridPosition {
+//                 x: grid_pos.x,
+//                 y: grid_pos.y,
+//             };
+//         }
+//     }
+//
+// }
+//

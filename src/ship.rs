@@ -1,9 +1,14 @@
 use uuid::Uuid;
 use std::collections::HashMap;
 use crate::structs::{Cords, Timer, ShipAction, RelCords};
-       // pramitor game_level: &GameLevel
-       // let (speed, _lives) = game_level.get_level_status(); 
-//TOD
+
+trait ship {
+    fn display_info(&self) -> (u8, u8, u8, u8);
+    fn get_id(&self) -> Uuid;
+    fn get_action(&mut self, cords: Cords, game_board: &mut HashMap<Cords, Ship>) -> ShipAction;
+    fn wrap(&self) -> bool;
+}
+
 pub enum Ship {
     Fly(ShipAI, bool, Uuid),
     Explosion(ShipAI, bool, Uuid),
@@ -11,11 +16,11 @@ pub enum Ship {
 }
 
 impl Ship {
-    pub fn display_char(&self) -> char {
+    pub fn display_info(&self) -> (u8, u8, u8, u8) {
         match self {
-            Ship::Fly(_, _, _) => 'F',
-            Ship::Explosion(_, _, _) => 'X',
-            Ship::Bullet(_, _, _) => '|',
+            Ship::Fly(_, _, _) => (0, 255, 0, 255),
+            Ship::Explosion(_, _, _) => (255, 0, 0, 255),
+            Ship::Bullet(_, _, _) => (255, 255, 0, 255),
         }
     }
 
@@ -50,9 +55,7 @@ impl Ship {
                 vec![
                     (None, AIAction::MoveOrNothing(RelCords(1, 0))),                         
                     (None, AIAction::MoveOrNothing(RelCords(0, -1))), 
-                    (None, AIAction::MoveOrNothing(RelCords(-1, 0))), 
-                    //TODO✅ make sure that the first thing in the touple has to be true befor it shoots 
-                    //TODO remove rel cords. 
+                    (None, AIAction::MoveOrNothing(RelCords(-1, 0))),
                     (Some(Condition::DontShootIfShipsAreBelow(RelCords(1, 0))), AIAction::Shoot),
                 ],
             ),

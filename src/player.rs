@@ -8,21 +8,21 @@ use bevy::{
     prelude::*,
 };
 
-
+#[derive(Component)]
 pub struct Player {
-    pub display_char: char,
+    pub file_path: String,
     pub lives: u8,
     pub current_position: Option<Cords>,
     pub start_position: Cords,
-    pub death_timer: Timer, 
+    pub death_timer: Timer,
     pub key_reader: KeyReader,
 }
 
 impl Player {
-    pub fn new(lives: u8) -> Self { 
+    pub fn new(lives: u8) -> Self {
         let start_position = Cords(ROWS - 2, COLUMNS / 2);
         Player {
-            display_char: '^', 
+            file_path: String::from("assets/spaceship.png"),
             lives,
             current_position: Some(start_position),
             start_position,
@@ -31,28 +31,6 @@ impl Player {
         }
     }
 
-    pub async fn use_key(&mut self) -> Option<Cords> {
-        if let Some(Cords(x, y)) = self.current_position {
-            match self.key_reader.read_key().await {
-                Some(Key::ArrowLeft) => {
-                    if y > 0 {
-                        self.move_to(Cords(x, y - 1));
-                    }
-                }
-                Some(Key::ArrowRight) => {
-                    if y < COLUMNS - 1 {
-                        self.move_to(Cords(x, y + 1));
-                    }
-                }
-                Some(Key::ArrowUp) => {
-                    return Some(Cords(x - 1, y));
-                }
-                Some(Key::CtrlC) => exit(0),
-                _ => {}
-            };
-        }
-        None
-    }
 
     pub fn move_to(&mut self, new_position: Cords) {
         self.current_position = Some(new_position);
@@ -102,49 +80,3 @@ impl KeyReader {
         }
     }
 }
-
-
-
-//TODO make the code below a copy of tE code above but dont change the key detction becuse its for bevy
-// pub fn handle_player_input(
-//     mut keyboard_input_events: EventReader<KeyboardInput>,
-//     mut player_position: ResMut<PlayerPosition>,
-//     mut query: Query<(&mut GridPosition, &mut Transform, &GameEntity), With<GameEntity>>,
-//     mut commands: Commands,
-//     color_palette: Res<ColorsPalette>,
-//     asset_server: Res<AssetServer>,
-// ) {
-//     let mut delta_x = 0;
-//     let mut delta_y = 0;
-//     let mut shoot = false;
-//
-//     // Process keyboard input
-//     for event in keyboard_input_events.read() {
-//         if let key_code = event.key_code {
-//             match key_code {
-//                 KeyCode::ArrowLeft => delta_x -= GRID_MOVE_DELTA,
-//                 KeyCode::ArrowRight => delta_x += GRID_MOVE_DELTA,
-//                 KeyCode::Space => shoot = true,
-//                 _ => {}
-//             }
-//         }
-//     }
-//
-//     // Update player position and transform
-//     for (mut grid_pos, mut transform, game_entity) in query.iter_mut() {
-//         if game_entity.entity_type == EntityType::Player {
-//             // Update the player's grid position
-//             grid_pos.x += delta_x;
-//             grid_pos.y += delta_y;
-//
-//             transform.translation = grid_to_world(&grid_pos);
-//
-//             player_position.0 = GridPosition {
-//                 x: grid_pos.x,
-//                 y: grid_pos.y,
-//             };
-//         }
-//     }
-//
-// }
-//

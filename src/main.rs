@@ -2,11 +2,14 @@ mod ship;
 mod player;
 mod game_state;
 mod structs;
+mod game;
 
-use crate::game_state::Game;
+
+use game::Game;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-    Game::start(&Game);
+    let game_instance = Game;
+    game_instance.start();
     Ok(())
 }

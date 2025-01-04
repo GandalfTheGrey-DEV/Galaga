@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::structs::{Cords, Timer, ShipAction, RelCords};
 
 trait ship {
-    fn display_info(&self) -> (u8, u8, u8, u8);
+    fn display_info(&self) -> String;
     fn get_id(&self) -> Uuid;
     fn get_action(&mut self, cords: Cords, game_board: &mut HashMap<Cords, Ship>) -> ShipAction;
     fn wrap(&self) -> bool;
@@ -16,11 +16,12 @@ pub enum Ship {
 }
 
 impl Ship {
-    pub fn display_info(&self) -> (u8, u8, u8, u8) {
+    //TODO make this display_info getter return a path to image assets
+    pub fn display_info(&self) -> String {
         match self {
-            Ship::Fly(_, _, _) => (0, 255, 0, 255),
-            Ship::Explosion(_, _, _) => (255, 0, 0, 255),
-            Ship::Bullet(_, _, _) => (255, 255, 0, 255),
+            Ship::Fly(_, _, _) => "assets/fly.png".to_string(),
+            Ship::Explosion(_, _, _) => "assets/explosion.png".to_string(),
+            Ship::Bullet(_, _, _) => "assets/bullet.png".to_string(),
         }
     }
 

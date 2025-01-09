@@ -30,8 +30,16 @@ enum GameStateWindows {
 impl Game {
     pub fn start(&self) {
         let mut game_state = GameState::new();
-        game_state.game_board.insert(Cords(0, 0), Ship::new_fly());
-        game_state.game_board.insert(Cords(1, 1), Ship::new_fly());
+        Ship::new_fly();
+        game_state.game_board.insert(Cords(1, 6), Ship::new_fly());
+        game_state.game_board.insert(Cords(0, 7), Ship::new_fly());
+        game_state.game_board.insert(Cords(1, 8), Ship::new_fly());
+        game_state.game_board.insert(Cords(0, 9), Ship::new_fly());
+        game_state.game_board.insert(Cords(1, 10), Ship::new_fly());
+        game_state.game_board.insert(Cords(0, 11), Ship::new_fly());
+        game_state.game_board.insert(Cords(1, 12), Ship::new_fly());
+        game_state.game_board.insert(Cords(0, 13), Ship::new_fly());
+        game_state.game_board.insert(Cords(1, 14), Ship::new_fly());
 
         let mut app = App::new();
         app.add_plugins(
@@ -57,7 +65,7 @@ impl Game {
 
             .add_systems(Startup, crate::background::background_setup)
             .add_systems(Update, crate::background::move_and_respawn_stars)
-
+            .add_systems(Startup, Self::startup)
             .add_systems(
                 Update,
                 (Self::player_event_listener)
@@ -73,80 +81,42 @@ impl Game {
             .run();
     }
 
-    pub fn startup(mut commands: Commands) {
+    pub fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
         commands.spawn(Camera2dBundle::default());
         commands.insert_resource(ClearColor(Color::BLACK));
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/galaga.ogg")));
     }
 
-    pub fn menu_enter(mut commands: Commands, asset_server: Res<AssetServer>) {
-        let icon = asset_server.load("assets/logo.png");
+    pub fn update(
+        mut commands: Commands,
+        mut game_state: ResMut<GameState>,
+        mut grid: ResMut<Grid>,
+        asset_server: Res<AssetServer>,
+        game_settings: Res<GameSettings>,
+    ) {
+        grid.despawn_entities(&mut commands);
 
-        commands
-            .spawn(Node {
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                ..default()
-            })
-            .with_children(|parent| {
-                parent.spawn((
-                    ImageNode::new(icon),
-                    Node {
-                        width: Val::Px(200.0),
-                        ..default()
-                    },
-                ));
-            });
-    }
+        game_state.ship_actions().unwrap();
+        game_state.player_actions(&game_settings);
 
-    pub fn setup_game_ui(mut commands: Commands) {
-        commands
-            .spawn((
-                Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    align_items: AlignItems::FlexStart,
-                    justify_content: JustifyContent::FlexStart,
-                    ..default()
-                },
-            ))
-            .with_children(|parent| {
-                parent
-                    .spawn((
-                        Node {
-                            width: Val::Auto,
-                            height: Val::Auto,
-                            margin: UiRect {
-                                left: Val::Px(20.0),
-                                top: Val::Px(20.0),
-                                right: Val::Px(0.0),
-                                bottom: Val::Px(0.0),
-                            },
-                            ..default()
-                        },
-                    ))
-                    .with_children(|p| {
-                        p.spawn((
-                            Text::new("Score: 0"),
-                            TextFont {
-                                font_size: 30.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                    });
-            });
-    }
+        for (&cords, ship) in game_state.game_board.iter() {
+            let image_path = ship.display_info();
+            let position = (cords.0 as usize, cords.1 as usize);
+            grid.add_image_entity(image_path, position);
+        }
 
-    pub fn game_over_enter(mut commands: Commands, asset_server: Res<AssetServer>) {
-        commands.spawn(Node {
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            ..default()
-        });
+        if let Some(player_position) = game_state.player.current_position {
+            let player_file_path = game_state.player.file_path.clone();
+            let position = (player_position.0 as usize, player_position.1 as usize);
+            grid.add_image_entity(player_file_path, position);
+        }
+
+        for i in 0..game_state.player.lives {
+            let position = (ROWS - 1, i as usize);
+            grid.add_image_entity(String::from("assets/spaceship.png"), position);
+        }
+
+        grid.render_entities(&mut commands, asset_server);
     }
 
     pub fn player_event_listener(
@@ -191,36 +161,78 @@ impl Game {
         game_settings.handle_auto_shoot(&mut game_state, &mut commands, &Default::default());
     }
 
-    pub fn update(
-        mut commands: Commands,
-        mut game_state: ResMut<GameState>,
-        mut grid: ResMut<Grid>,
-        asset_server: Res<AssetServer>,
-        game_settings: Res<GameSettings>,
-    ) {
-        grid.despawn_entities(&mut commands);
+    //PAGES
+    pub fn menu_enter(mut commands: Commands, asset_server: Res<AssetServer>) {
+        let icon = asset_server.load("assets/logo.png");
 
-        game_state.ship_actions().unwrap();
-        game_state.player_actions(&game_settings);
+        commands
+            .spawn(Node {
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            })
+            .with_children(|parent| {
+                parent.spawn((
+                    ImageNode::new(icon),
+                    Node {
+                        width: Val::Px(200.0),
+                        ..default()
+                    },
+                ));
+            });
+    }
 
-        for (&cords, ship) in game_state.game_board.iter() {
-            let image_path = ship.display_info();
-            let position = (cords.0 as usize, cords.1 as usize);
-            grid.add_image_entity(image_path, position);
-        }
+    pub fn game_over_enter(mut commands: Commands, asset_server: Res<AssetServer>) {
+        commands.spawn(Node {
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            ..default()
+        });
+    }
 
-        if let Some(player_position) = game_state.player.current_position {
-            let player_file_path = game_state.player.file_path.clone();
-            let position = (player_position.0 as usize, player_position.1 as usize);
-            grid.add_image_entity(player_file_path, position);
-        }
 
-        for i in 0..game_state.player.lives {
-            let position = (ROWS - 1, i as usize);
-            grid.add_image_entity(String::from("assets/spaceship.png"), position);
-        }
-
-        grid.render_entities(&mut commands, asset_server);
+    //SCORE TEXT
+    pub fn setup_game_ui(mut commands: Commands) {
+        commands
+            .spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    align_items: AlignItems::FlexStart,
+                    justify_content: JustifyContent::FlexStart,
+                    ..default()
+                },
+            ))
+            .with_children(|parent| {
+                parent
+                    .spawn((
+                        Node {
+                            width: Val::Auto,
+                            height: Val::Auto,
+                            margin: UiRect {
+                                left: Val::Px(20.0),
+                                top: Val::Px(20.0),
+                                right: Val::Px(0.0),
+                                bottom: Val::Px(0.0),
+                            },
+                            ..default()
+                        },
+                    ))
+                    .with_children(|p| {
+                        p.spawn((
+                            Text::new("Score: 0"),
+                            TextFont {
+                                font_size: 30.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                    });
+            });
     }
 }
 

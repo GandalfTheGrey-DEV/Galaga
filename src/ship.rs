@@ -56,17 +56,10 @@ impl Ship {
 
     pub fn new_fly() -> Self {
         let mut rng = rand::thread_rng();
-        let random_pattern = match rng.gen_range(0..10) {
+        let random_pattern = match rng.gen_range(0..3) {
             0 => Fly_Pattern::Pattern1,
             1 => Fly_Pattern::Pattern2,
-            2 => Fly_Pattern::Pattern3,
-            3 => Fly_Pattern::Pattern4,
-            4 => Fly_Pattern::Pattern5,
-            5 => Fly_Pattern::Pattern6,
-            6 => Fly_Pattern::Pattern7,
-            7 => Fly_Pattern::Pattern8,
-            8 => Fly_Pattern::Pattern9,
-            _ => Fly_Pattern::Pattern10,
+            _ => Fly_Pattern::Pattern3,
         };
 
         let actions = random_pattern.fly_pattern();

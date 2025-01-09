@@ -31,7 +31,6 @@ impl Player {
         }
     }
 
-
     pub fn move_to(&mut self, new_position: Cords) {
         self.current_position = Some(new_position);
     }

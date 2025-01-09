@@ -1,5 +1,7 @@
 use uuid::Uuid;
 use std::collections::HashMap;
+use rand::Rng;
+use crate::fly_patterns::{Fly_Pattern};
 use crate::structs::{Cords, Timer, ShipAction, RelCords};
 
 trait ship {
@@ -16,7 +18,9 @@ pub enum Ship {
 }
 
 impl Ship {
-    //TODO make this display_info getter return a path to image assets
+    pub fn is_fly(&self) -> bool {
+        matches!(self, Ship::Fly(_, _, _))
+    }
     pub fn display_info(&self) -> String {
         match self {
             Ship::Fly(_, _, _) => "assets/fly.png".to_string(),
@@ -49,17 +53,26 @@ impl Ship {
         }
     }
 
+
     pub fn new_fly() -> Self {
+        let mut rng = rand::thread_rng();
+        let random_pattern = match rng.gen_range(0..10) {
+            0 => Fly_Pattern::Pattern1,
+            1 => Fly_Pattern::Pattern2,
+            2 => Fly_Pattern::Pattern3,
+            3 => Fly_Pattern::Pattern4,
+            4 => Fly_Pattern::Pattern5,
+            5 => Fly_Pattern::Pattern6,
+            6 => Fly_Pattern::Pattern7,
+            7 => Fly_Pattern::Pattern8,
+            8 => Fly_Pattern::Pattern9,
+            _ => Fly_Pattern::Pattern10,
+        };
+
+        let actions = random_pattern.fly_pattern();
+
         Self::Fly(
-            ShipAI::new(
-                100,
-                vec![
-                    (None, AIAction::MoveOrNothing(RelCords(1, 0))),                         
-                    (None, AIAction::MoveOrNothing(RelCords(0, -1))), 
-                    (None, AIAction::MoveOrNothing(RelCords(-1, 0))),
-                    (Some(Condition::DontShootIfShipsAreBelow(RelCords(1, 0))), AIAction::Shoot),
-                ],
-            ),
+            ShipAI::new(100, actions),
             true,
             Uuid::new_v4(),
         )

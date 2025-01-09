@@ -9,6 +9,7 @@ use bevy::prelude::*;
 use bevy::ecs::system::Resource;
 use crate::structs::ShipAction;
 use crate::player::Player;
+use crate::settings::GameSettings;
 
 #[derive(Resource)]
 pub struct GameState {
@@ -16,6 +17,7 @@ pub struct GameState {
     pub tick_count: u32,
     pub player: Player,
     pub gamelevel: GameLevel,
+    pub score: u32,
 }
 
 impl GameState {
@@ -28,8 +30,14 @@ impl GameState {
             tick_count: 0,
             player: Player::new(level_status.1),
             gamelevel: game_level,
+            score: 0,
         }
     }
+
+    pub fn increase_score(&mut self, points: u32) {
+        self.score += points;
+    }
+
 
     pub fn add_ship(&mut self, cords: Cords, ship: Ship) -> Result<(), String> {
         if cords.0 >= ROWS || cords.1 >= COLUMNS {
@@ -52,7 +60,7 @@ impl GameState {
         }
     }
 
-    pub fn ship_actions(&mut self,) -> Result<(), String> {
+    pub fn ship_actions(&mut self) -> Result<(), String> {
         let to_update = self
             .game_board
             .iter()
@@ -65,7 +73,11 @@ impl GameState {
                     continue;
                 }
                 match current_ship.get_action(cords, &mut self.game_board) {
-                    ShipAction::Remove => {}
+                    ShipAction::Remove => {
+                        if current_ship.is_fly() {
+                            self.increase_score(100);
+                        }
+                    }
                     ShipAction::Shoot => {
                         let shoot_position = Cords(cords.0 + 1, cords.1);
                         self.add_ship(cords, current_ship)?;
@@ -83,31 +95,34 @@ impl GameState {
         Ok(())
     }
 
-    pub fn player_actions(&mut self) {
+    pub fn player_actions(&mut self, game_settings: &GameSettings) {
         if let Some(player_pos) = self.player.current_position {
-            if self.game_board.get(&player_pos).is_some() {
+            if let Some(_) = self.game_board.get(&player_pos) {
+                if game_settings.no_death {
+                    self.remove_ship(player_pos);
+                    self.player.respawn(true);
+                    return;
+                }
+
                 self.remove_ship(player_pos);
                 self.game_board.insert(player_pos, Ship::new_explosion());
 
                 if let Some(lives) = self.player.handle_collision() {
-                    println!("oh crap...lives left: {}", lives - 1);
                 } else {
-                    println!("ow, you died.");
                     exit(0);
                 }
             }
         }
 
         self.player.respawn(self.game_board.get(&self.player.start_position).is_none());
-
     }
 
-    pub async fn start_game(&mut self) -> Result<(), String> {
+    pub async fn start_game(&mut self, game_settings: &GameSettings) -> Result<(), String> {
         loop {
             thread::sleep(Duration::from_millis(10));
             self.tick_count += 1;
             self.ship_actions()?;
-            self.player_actions();
+            self.player_actions(&game_settings);
         }
     }
 }

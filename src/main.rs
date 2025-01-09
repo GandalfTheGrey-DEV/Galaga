@@ -3,7 +3,9 @@ mod player;
 mod game_state;
 mod structs;
 mod game;
-
+mod settings;
+mod fly_patterns;
+mod background;
 
 use game::Game;
 

@@ -1,7 +1,8 @@
 use uuid::Uuid;
 use std::collections::HashMap;
 use rand::Rng;
-use crate::fly_patterns::{Fly_Pattern};
+use crate::fly_patterns::Fly_Pattern;
+use crate::settings::GameSettings;
 use crate::structs::{Cords, Timer, ShipAction, RelCords};
 
 trait ship {
@@ -12,49 +13,55 @@ trait ship {
 }
 
 pub enum Ship {
-    Fly(ShipAI, bool, Uuid),
+    Fly(ShipAI, bool, Uuid, u32, bool, bool), // Add `allow_shoot` as the last field
     Explosion(ShipAI, bool, Uuid),
-    Bullet(ShipAI, bool, Uuid),
+    Laser(ShipAI, bool, Uuid, bool, u32), // Add speed as the fifth field for bullets
 }
 
 impl Ship {
     pub fn is_fly(&self) -> bool {
-        matches!(self, Ship::Fly(_, _, _))
+        matches!(self, Ship::Fly(_, _, _, _, _, _))
     }
+
     pub fn display_info(&self) -> String {
         match self {
-            Ship::Fly(_, _, _) => "assets/fly.png".to_string(),
+            Ship::Fly(_, _, _, _, _, _) => "assets/fly.png".to_string(),
             Ship::Explosion(_, _, _) => "assets/explosion.png".to_string(),
-            Ship::Bullet(_, _, _) => "assets/bullet.png".to_string(),
+            Ship::Laser(_, _, _, moving_down, _) => {
+                if *moving_down {
+                    "assets/bullet_downward.png".to_string()
+                } else {
+                    "assets/bullet_upward.png".to_string()
+                }
+            }
         }
     }
 
     pub fn get_id(&self) -> Uuid {
         match self {
-            Ship::Fly(_, _, id) => *id,
+            Ship::Fly(_, _, id, _, _, _) => *id,
             Ship::Explosion(_, _, id) => *id,
-            Ship::Bullet(_, _, id) => *id,
+            Ship::Laser(_, _, id, _, _) => *id,
         }
     }
 
     pub fn get_action(&mut self, cords: Cords, game_board: &mut HashMap<Cords, Ship>) -> ShipAction {
         match self {
-            Ship::Fly(ai, _, _) => ai.get_action(cords, game_board),
+            Ship::Fly(ai, _, _, _, _, _) => ai.get_action(cords, game_board),
             Ship::Explosion(ai, _, _) => ai.get_action(cords, game_board),
-            Ship::Bullet(ai, _, _) => ai.get_action(cords, game_board),
+            Ship::Laser(ai, _, _, _, _) => ai.get_action(cords, game_board),
         }
     }
 
     pub fn wrap(&self) -> bool {
         match self {
-            Ship::Fly(_, wrap, _) => *wrap,
+            Ship::Fly(_, wrap, _, _, _, _) => *wrap,
             Ship::Explosion(_, wrap, _) => *wrap,
-            Ship::Bullet(_, wrap, _) => *wrap,
+            Ship::Laser(_, wrap, _, _, _) => *wrap,
         }
     }
 
-
-    pub fn new_fly() -> Self {
+pub fn new_fly(speed: u32, wrap: bool, allow_shoot: bool) -> Self {
         let mut rng = rand::thread_rng();
         let random_pattern = match rng.gen_range(0..3) {
             0 => Fly_Pattern::Pattern1,
@@ -62,39 +69,55 @@ impl Ship {
             _ => Fly_Pattern::Pattern3,
         };
 
-        let actions = random_pattern.fly_pattern();
+        let mut actions = random_pattern.fly_pattern();
+        if !wrap {
+            actions = actions
+                .into_iter()
+                .map(|(cond, action)| match action {
+                    AIAction::MoveOrNothing(_) => (cond, AIAction::Nothing),
+                    other => (cond, other),
+                })
+                .collect();
+        }
+        if !allow_shoot {
+            actions = actions
+                .into_iter()
+                .map(|(cond, action)| match action {
+                    AIAction::ShootOrNothing => (cond, AIAction::Nothing),
+                    other => (cond, other),
+                })
+                .collect();
+        }
 
-        Self::Fly(
-            ShipAI::new(100, actions),
-            true,
-            Uuid::new_v4(),
-        )
+        Self::Fly(ShipAI::new(speed as u64, actions), wrap, Uuid::new_v4(), 0, allow_shoot, true)
     }
 
-    pub fn new_bullet(moving_down: bool) -> Self {
+    pub fn new_bullet(moving_down: bool, speed: u32) -> Self {
         let movement = if moving_down { RelCords(1, 0) } else { RelCords(-1, 0) };
-        Self::Bullet(
+
+        Self::Laser(
             ShipAI::new(
-                10, 
+                speed as u64,
                 vec![(None, AIAction::RelativeMove(movement))],
-            ), 
-            false, 
+            ),
+            false,
             Uuid::new_v4(),
+            moving_down,
+            speed, // Store speed
         )
     }
 
     pub fn new_explosion() -> Self {
         Self::Explosion(
             ShipAI::new(
-                10, 
+                20,
                 vec![(None, AIAction::Remove)],
-            ), 
-            false, 
+            ),
+            false,
             Uuid::new_v4(),
         )
     }
 }
-
 
 pub struct ShipAI {
     pub timer: Timer,
@@ -122,7 +145,7 @@ impl ShipAI {
             if let Some(condition) = condition {
                 if !condition.evaluate(cords, game_board) {
                     self.next_action();
-                    return self.get_ai_action(cords, game_board); 
+                    return self.get_ai_action(cords, game_board);
                 }
             }
 
@@ -132,7 +155,7 @@ impl ShipAI {
                 self.action_index += 1;
             }
 
-            return action.clone(); 
+            return action.clone();
         }
 
         AIAction::Nothing
@@ -155,8 +178,6 @@ impl ShipAI {
     }
 }
 
-
-
 pub enum Condition {
     ShipExists(Cords),
     PositionAvailable(RelCords),
@@ -176,11 +197,11 @@ impl Condition {
                 let mut below_cords = cords;
                 loop {
                     if !game_board.contains_key(&below_cords) {
-                        break; 
+                        break;
                     }
 
                     if let Some(ship) = game_board.get(&below_cords) {
-                        if let Ship::Fly(_, _, _) = ship {
+                        if let Ship::Fly(_, _, _, _, _, _) = ship {
                             return false;
                         }
                     }
@@ -191,8 +212,6 @@ impl Condition {
         }
     }
 }
-
-
 
 #[derive(Clone)]
 pub enum AIAction {
@@ -236,7 +255,7 @@ impl AIAction {
             }
 
             AIAction::ShootOrNothing => {
-                let condition = Condition::DontShootIfShipsAreBelow(RelCords(1, 0)); 
+                let condition = Condition::DontShootIfShipsAreBelow(RelCords(1, 0));
                 if condition.evaluate(cords, game_board) {
                     ShipAction::Shoot
                 } else {
@@ -250,5 +269,3 @@ impl AIAction {
         }
     }
 }
-
-

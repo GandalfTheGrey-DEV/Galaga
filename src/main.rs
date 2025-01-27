@@ -6,6 +6,7 @@ mod game;
 mod settings;
 mod fly_patterns;
 mod background;
+mod game_over;
 
 use game::Game;
 

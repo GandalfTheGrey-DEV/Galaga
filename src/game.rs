@@ -9,82 +9,109 @@ use bevy::window::WindowMode;
 
 use crate::game_state::GameState;
 use crate::settings::GameSettings;
+use std::default::Default;
 use crate::ship::Ship;
 use crate::structs::{Cords, COLUMNS, ROWS};
 
 pub struct Game;
 
-const TEXT_COLOR: Color = Color::WHITE;
+
+use bevy::time::Timer;
+
+use crate::game_over::{game_over_enter, gameover_button_system};
+
+pub(crate) const TEXT_COLOR: Color = Color::WHITE;
+
+// Add this struct to track the time since the last movement
 
 #[derive(Component)]
-struct ScoreText;
+pub(crate) struct ScoreText;
 
 #[derive(Clone, Copy, Default, Eq, PartialEq, Debug, Hash, States)]
 enum GameStateWindows {
     #[default]
     Playing,
-    Menu,
     GameOver,
+    Menu,
 }
 
 impl Game {
     pub fn start(&self) {
-        let mut game_state = GameState::new();
-        Ship::new_fly();
-        game_state.game_board.insert(Cords(1, 6), Ship::new_fly());
-        game_state.game_board.insert(Cords(0, 7), Ship::new_fly());
-        game_state.game_board.insert(Cords(1, 8), Ship::new_fly());
-        game_state.game_board.insert(Cords(0, 9), Ship::new_fly());
-        game_state.game_board.insert(Cords(1, 10), Ship::new_fly());
-        game_state.game_board.insert(Cords(0, 11), Ship::new_fly());
-        game_state.game_board.insert(Cords(1, 12), Ship::new_fly());
-        game_state.game_board.insert(Cords(0, 13), Ship::new_fly());
-        game_state.game_board.insert(Cords(1, 14), Ship::new_fly());
+    let mut game_state = GameState::new();
+    let mut game_settings = GameSettings::new();
+    let fly_speed = game_settings.set_fly_speed(Default::default(), 4);
+    pub fn spawn_flies(
+        game_state: &mut GameState,
+        game_settings: &GameSettings,
+        fly_speed: u32,
+        gap: usize,
+    ) {
+        let number_of_flys = game_settings.number_of_flys;
+
+        for i in 0..COLUMNS {
+            let x = if i % 2 == 0 { 0 } else { 1 };
+            let y = i;
+
+            game_state
+                .game_board
+                .insert(Cords(x, y), Ship::new_fly(fly_speed, game_settings.fly_move, game_settings.laser_shoot));
+        }
+    }
+
+    spawn_flies(&mut game_state, &game_settings, fly_speed, 2);
 
         let mut app = App::new();
-        app.add_plugins(
-            DefaultPlugins
-                .set(LogPlugin {
-                    level: Level::DEBUG,
-                    filter: "wgpu=error".to_string(),
-                    ..default()
-                })
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        resizable: false,
-                        mode: WindowMode::Windowed,
-                        ..default()
-                    }),
+    app.add_plugins(
+        DefaultPlugins
+            .set(LogPlugin {
+                level: Level::DEBUG,
+                filter: "wgpu=error".to_string(),
+                ..default()
+            })
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    resizable: false,
+                    mode: WindowMode::Windowed,
                     ..default()
                 }),
+                ..default()
+            }),
+    )
+        .insert_resource(game_state)
+        .insert_resource(Grid::new(50.0))
+        .insert_resource(GameSettings::new())
+        .init_state::<GameStateWindows>()
+        .add_systems(Update, gameover_button_system)
+        .add_systems(Startup, crate::background::background_setup)
+        .add_systems(Update, crate::background::move_and_respawn_stars)
+        .add_systems(Update, Self::settings_display)
+        .add_systems(Startup, Self::startup)
+        //SCORE
+        .add_systems(Update, Self::score_display)
+        .add_systems(
+            Update,
+            Self::keyboard_event_system.distributive_run_if(in_state(GameStateWindows::Playing)),
         )
-            .insert_resource(game_state)
-            .insert_resource(Grid::new(50.0))
-            .insert_resource(GameSettings::new())
-            .init_state::<GameStateWindows>()
-
-            .add_systems(Startup, crate::background::background_setup)
-            .add_systems(Update, crate::background::move_and_respawn_stars)
-            .add_systems(Startup, Self::startup)
-            .add_systems(
-                Update,
-                (Self::player_event_listener)
-                    .distributive_run_if(in_state(GameStateWindows::Playing)),
-            )
-            .add_systems(
-                Update,
-                (Self::update).distributive_run_if(in_state(GameStateWindows::Playing)),
-            )
-            .add_systems(OnEnter(GameStateWindows::Menu), Self::menu_enter)
-            .add_systems(OnEnter(GameStateWindows::GameOver), Self::game_over_enter)
-            .add_systems(OnEnter(GameStateWindows::Playing), Self::setup_game_ui)
-            .run();
-    }
+        .add_systems(
+            Update,
+            Self::gamepad_event_system.distributive_run_if(in_state(GameStateWindows::Playing)),
+        )
+        .add_systems(
+            Update,
+            (Self::update).distributive_run_if(in_state(GameStateWindows::Playing)),
+        )
+        .add_systems(OnEnter(GameStateWindows::Menu), Self::menu_enter)
+        .add_systems(OnEnter(GameStateWindows::GameOver), game_over_enter)
+        .add_systems(OnEnter(GameStateWindows::Playing), |mut commands: Commands| {
+            commands.insert_resource(ClearColor(TEXT_COLOR));
+        })
+        .run();
+}
 
     pub fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
         commands.spawn(Camera2dBundle::default());
         commands.insert_resource(ClearColor(Color::BLACK));
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/galaga.ogg")));
+       // commands.spawn(AudioPlayer::new(asset_server.load("sounds/galaga.ogg")));
     }
 
     pub fn update(
@@ -96,7 +123,7 @@ impl Game {
     ) {
         grid.despawn_entities(&mut commands);
 
-        game_state.ship_actions().unwrap();
+        game_state.ship_actions(&game_settings).unwrap();
         game_state.player_actions(&game_settings);
 
         for (&cords, ship) in game_state.game_board.iter() {
@@ -117,49 +144,167 @@ impl Game {
         }
 
         grid.render_entities(&mut commands, asset_server);
+
     }
 
-    pub fn player_event_listener(
+    pub fn keyboard_event_system(
         mut keyboard_input_events: EventReader<KeyboardInput>,
         mut game_state: ResMut<GameState>,
         mut game_settings: ResMut<GameSettings>,
         mut commands: Commands,
         asset_server: Res<AssetServer>,
     ) {
+        if !game_settings.keyboard_enabled {
+            return;
+        }
+
         if let Some(Cords(x, y)) = game_state.player.current_position {
             for event in keyboard_input_events.read() {
                 if event.state == ButtonState::Pressed {
                     match event.key_code {
                         KeyCode::ArrowLeft => {
-                            if y > 0 && !game_settings.auto_move {
+                            if y > 0 && !game_settings.auto_pilot {
                                 game_state.player.move_to(Cords(x, y - 1));
                             }
                         }
+
                         KeyCode::ArrowRight => {
-                            if y < COLUMNS - 1 && !game_settings.auto_move {
+                            if y < COLUMNS - 1 && !game_settings.auto_pilot {
                                 game_state.player.move_to(Cords(x, y + 1));
                             }
                         }
+
                         KeyCode::Space => {
                             if !game_settings.auto_shoot {
                                 let bullet_position = Cords(x - 1, y);
-                                commands.spawn(
-                                    AudioPlayer::new(asset_server.load("sounds/shooting.ogg")),
-                                );
+                                commands.spawn(AudioPlayer::new(asset_server.load("sounds/shooting.ogg")));
                                 game_state
-                                    .add_ship(bullet_position, Ship::new_bullet(false))
+                                    .add_ship(bullet_position, Ship::new_bullet(false, 15))
                                     .ok();
                             }
                         }
+
+                        KeyCode::KeyD => {
+                            game_settings.invocable = !game_settings.invocable;
+                            println!("Invocable toggled: {}", game_settings.invocable);
+                        }
+
+                        KeyCode::KeyM => {
+                            game_settings.auto_pilot = !game_settings.auto_pilot;
+                            println!("Auto Pilot toggled: {}", game_settings.auto_pilot);
+                        }
+
+                        KeyCode::KeyS => {
+                            game_settings.auto_shoot = !game_settings.auto_shoot;
+                            println!("Auto Shoot toggled: {}", game_settings.auto_shoot);
+                        }
+
+                        KeyCode::KeyA => {
+                            game_settings.fly_move = !game_settings.fly_move;
+                            println!("Fly Move toggled: {}", game_settings.fly_move);
+                        }
+
+                        KeyCode::KeyW => {
+                            game_settings.laser_shoot = !game_settings.laser_shoot;
+                            println!("Laser Shoot toggled: {}", game_settings.laser_shoot);
+                        }
+
                         _ => {}
                     }
                 }
             }
         }
 
+        // Handle auto-move and auto-shoot logic if enabled
         game_settings.handle_auto_move(&mut game_state, &Default::default());
         game_settings.handle_auto_shoot(&mut game_state, &mut commands, &Default::default());
     }
+
+    fn gamepad_event_system(
+        mut gamepads: Query<(Entity, &Gamepad)>,
+        mut game_state: ResMut<GameState>,
+        mut game_settings: ResMut<GameSettings>,
+        mut commands: Commands,
+        asset_server: Res<AssetServer>,
+        mut reset_flag: Local<bool>,
+    ) {
+        if !game_settings.gamepad_enabled {
+            return;
+        }
+
+        for (_, gamepad) in &mut gamepads {
+            for button in [
+                GamepadButton::North,
+                GamepadButton::East,
+                GamepadButton::South,
+                GamepadButton::West,
+                GamepadButton::DPadUp,
+                GamepadButton::DPadDown,
+                GamepadButton::DPadLeft,
+                GamepadButton::DPadRight,
+            ] {
+                if gamepad.just_pressed(button) {
+                    match button {
+                        GamepadButton::North => {
+                            game_settings.invocable = !game_settings.invocable;
+                            println!("Invocable toggled (Y): {}", game_settings.invocable);
+                        }
+                        GamepadButton::West => {
+                            game_settings.auto_pilot = !game_settings.auto_pilot;
+                            println!("Auto Pilot toggled (X): {}", game_settings.auto_pilot);
+                        }
+                        GamepadButton::South => {
+                            game_settings.auto_shoot = !game_settings.auto_shoot;
+                            println!("Auto Shoot toggled (A): {}", game_settings.auto_shoot);
+                        }
+                        GamepadButton::East => {
+                            game_settings.fly_move = !game_settings.fly_move;
+                            println!("Fly Move toggled (B): {}", game_settings.fly_move);
+                        }
+                        GamepadButton::DPadRight => {
+                            game_settings.laser_shoot = !game_settings.laser_shoot;
+                            println!("Laser Shoot toggled (D-pad Right): {}", game_settings.laser_shoot);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if gamepad.just_pressed(GamepadButton::LeftTrigger2)
+                || gamepad.just_pressed(GamepadButton::RightTrigger2)
+            {
+                if !game_settings.auto_shoot {
+                    if let Some(Cords(x, y)) = game_state.player.current_position {
+                        let bullet_position = Cords(x - 1, y);
+                        commands.spawn(AudioPlayer::new(asset_server.load("sounds/shooting.ogg")));
+                        let _ = game_state.add_ship(bullet_position, Ship::new_bullet(false, 15));
+                    }
+                }
+            }
+
+            if let Some(left_stick_x) = gamepad.get(GamepadAxis::LeftStickX) {
+                if let Some(Cords(x, y)) = game_state.player.current_position {
+                    if *reset_flag {
+                        if left_stick_x.abs() < 0.1 {
+                            *reset_flag = false;
+                        }
+                    } else {
+                        if left_stick_x < -0.5 && y > 0 && !game_settings.auto_pilot {
+                            game_state.player.move_to(Cords(x, y - 1));
+                            *reset_flag = true;
+                        } else if left_stick_x > 0.5 && y < COLUMNS - 1 && !game_settings.auto_pilot {
+                            game_state.player.move_to(Cords(x, y + 1));
+                            *reset_flag = true;
+                        }
+                    }
+                }
+            }
+
+            game_settings.handle_auto_move(&mut game_state, &Default::default());
+            game_settings.handle_auto_shoot(&mut game_state, &mut commands, &Default::default());
+        }
+    }
+
 
     //PAGES
     pub fn menu_enter(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -184,29 +329,27 @@ impl Game {
             });
     }
 
-    pub fn game_over_enter(mut commands: Commands, asset_server: Res<AssetServer>) {
-        commands.spawn(Node {
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            ..default()
-        });
-    }
+    //SCORE DISPLAY
+    pub fn score_display(
+        mut commands: Commands,
+        game_state: Res<GameState>,
+        query: Query<Entity, With<ScoreText>>,
+        asset_server: Res<AssetServer>,
+    ) {
+        for entity in query.iter() {
+            commands.entity(entity).despawn_recursive();
+        }
 
+        let score = game_state.score;
 
-    //SCORE TEXT
-    pub fn setup_game_ui(mut commands: Commands) {
         commands
-            .spawn((
-                Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    align_items: AlignItems::FlexStart,
-                    justify_content: JustifyContent::FlexStart,
-                    ..default()
-                },
-            ))
+            .spawn(Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                align_items: AlignItems::FlexStart,
+                justify_content: JustifyContent::FlexStart,
+                ..default()
+            })
             .with_children(|parent| {
                 parent
                     .spawn((
@@ -221,12 +364,193 @@ impl Game {
                             },
                             ..default()
                         },
+                        ScoreText,
                     ))
                     .with_children(|p| {
                         p.spawn((
-                            Text::new("Score: 0"),
+                            Text::new(format!("Score: {}", score)),
                             TextFont {
-                                font_size: 30.0,
+                                font_size: 25.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                    });
+            });
+    }
+
+    //SET SETTINGS
+    // Add settings display logic for ON and OFF
+    pub fn settings_display(
+        mut commands: Commands,
+        query: Query<Entity, With<ScoreText>>,
+        game_settings: Res<GameSettings>,
+    ) {
+        for entity in query.iter() {
+            commands.entity(entity).despawn_recursive();
+        }
+
+        commands.spawn(Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::FlexStart,
+            justify_content: JustifyContent::FlexEnd,
+            ..default()
+        })
+            .with_children(|parent| {
+                // Keyboard settings column
+                parent.spawn(Node {
+                    width: Val::Auto,
+                    height: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::FlexStart,
+                    margin: UiRect {
+                        right: Val::Px(20.0),
+                        top: Val::Px(20.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                    .with_children(|keyboard_section| {
+                        keyboard_section.spawn((
+                            Text::new("Keyboard"),
+                            TextFont {
+                                font_size: 20.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                        keyboard_section.spawn((
+                            Text::new(format!(
+                                "{} :invocable: (D)",
+                                if game_settings.invocable { "ON" } else { "OFF" }
+                            )),
+                            TextFont {
+                                font_size: 15.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                        keyboard_section.spawn((
+                            Text::new(format!(
+                                "{} :auto pilot: (M)",
+                                if game_settings.auto_pilot { "ON" } else { "OFF" }
+                            )),
+                            TextFont {
+                                font_size: 15.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                        keyboard_section.spawn((
+                            Text::new(format!(
+                                "{} :auto shoot: (S)",
+                                if game_settings.auto_shoot { "ON" } else { "OFF" }
+                            )),
+                            TextFont {
+                                font_size: 15.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                        keyboard_section.spawn((
+                            Text::new(format!(
+                                "{} :fly move: (A)",
+                                if game_settings.fly_move { "ON" } else { "OFF" }
+                            )),
+                            TextFont {
+                                font_size: 15.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                        keyboard_section.spawn((
+                            Text::new(format!(
+                                "{} :laser shoot: (W)",
+                                if game_settings.laser_shoot { "ON" } else { "OFF" }
+                            )),
+                            TextFont {
+                                font_size: 15.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                    });
+
+                // Xbox settings column
+                parent.spawn(Node {
+                    width: Val::Auto,
+                    height: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::FlexStart,
+                    margin: UiRect {
+                        right: Val::Px(20.0),
+                        top: Val::Px(20.0),
+                        ..default()
+                    },
+                    ..default()
+                })
+                    .with_children(|xbox_section| {
+                        xbox_section.spawn((
+                            Text::new("Xbox"),
+                            TextFont {
+                                font_size: 20.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                        xbox_section.spawn((
+                            Text::new(format!(
+                                "{} :invocable: (Y)",
+                                if game_settings.invocable { "ON" } else { "OFF" }
+                            )),
+                            TextFont {
+                                font_size: 15.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                        xbox_section.spawn((
+                            Text::new(format!(
+                                "{} :auto pilot: (X)",
+                                if game_settings.auto_pilot { "ON" } else { "OFF" }
+                            )),
+                            TextFont {
+                                font_size: 15.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                        xbox_section.spawn((
+                            Text::new(format!(
+                                "{} :auto shoot: (A)",
+                                if game_settings.auto_shoot { "ON" } else { "OFF" }
+                            )),
+                            TextFont {
+                                font_size: 15.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                        xbox_section.spawn((
+                            Text::new(format!(
+                                "{} :fly move: (B)",
+                                if game_settings.fly_move { "ON" } else { "OFF" }
+                            )),
+                            TextFont {
+                                font_size: 15.0,
+                                ..default()
+                            },
+                            TextColor(TEXT_COLOR),
+                        ));
+                        xbox_section.spawn((
+                            Text::new(format!(
+                                "{} :laser shoot: (D-pad right)",
+                                if game_settings.laser_shoot { "ON" } else { "OFF" }
+                            )),
+                            TextFont {
+                                font_size: 15.0,
                                 ..default()
                             },
                             TextColor(TEXT_COLOR),
@@ -236,7 +560,8 @@ impl Game {
     }
 }
 
-#[derive(Resource)]
+#[derive(Resource, Debug)]
+
 struct Grid {
     cell_size: f32,
     entities: Vec<(String, (usize, usize))>,

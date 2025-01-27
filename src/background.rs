@@ -16,8 +16,6 @@ pub fn background_setup(mut commands: Commands, windows: Query<&Window, With<Pri
 
     let mut rng = rand::thread_rng();
 
-    commands.spawn(Camera2dBundle::default());
-
     for _ in 0..star_count {
         let position = Vec3::new(
             rng.gen_range(-screen_width / 2.0..screen_width / 2.0),

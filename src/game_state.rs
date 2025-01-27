@@ -17,6 +17,8 @@ pub struct GameState {
     pub tick_count: u32,
     pub player: Player,
     pub gamelevel: GameLevel,
+
+    //SCORE
     pub score: u32,
 }
 
@@ -30,14 +32,15 @@ impl GameState {
             tick_count: 0,
             player: Player::new(level_status.1),
             gamelevel: game_level,
+            //SCORE
             score: 0,
         }
     }
 
+    //SCORE
     pub fn increase_score(&mut self, points: u32) {
         self.score += points;
     }
-
 
     pub fn add_ship(&mut self, cords: Cords, ship: Ship) -> Result<(), String> {
         if cords.0 >= ROWS || cords.1 >= COLUMNS {
@@ -51,7 +54,14 @@ impl GameState {
     }
 
     pub fn remove_ship(&mut self, cords: Cords) -> Option<Ship> {
-        self.game_board.remove(&cords)
+        if let Some(ship) = self.game_board.remove(&cords) {
+            if ship.is_fly() {
+                self.increase_score(100);
+                println!("Score updated: {}", self.score);
+            }
+            return Some(ship);
+        }
+        None
     }
 
     pub fn move_ship(&mut self, old_cords: Cords, new_cords: Cords) {
@@ -60,7 +70,7 @@ impl GameState {
         }
     }
 
-    pub fn ship_actions(&mut self) -> Result<(), String> {
+    pub fn ship_actions(&mut self, game_settings: &GameSettings) -> Result<(), String> {
         let to_update = self
             .game_board
             .iter()
@@ -74,14 +84,12 @@ impl GameState {
                 }
                 match current_ship.get_action(cords, &mut self.game_board) {
                     ShipAction::Remove => {
-                        if current_ship.is_fly() {
-                            self.increase_score(100);
-                        }
+                        self.remove_ship(cords);
                     }
                     ShipAction::Shoot => {
                         let shoot_position = Cords(cords.0 + 1, cords.1);
                         self.add_ship(cords, current_ship)?;
-                        self.add_ship(shoot_position, Ship::new_bullet(true))?;
+                        self.add_ship(shoot_position, Ship::new_bullet(true, 15))?;
                     }
                     ShipAction::Move(new_cords, wrapped) => {
                         if !wrapped || (wrapped && current_ship.wrap()) {
@@ -98,7 +106,7 @@ impl GameState {
     pub fn player_actions(&mut self, game_settings: &GameSettings) {
         if let Some(player_pos) = self.player.current_position {
             if let Some(_) = self.game_board.get(&player_pos) {
-                if game_settings.no_death {
+                if game_settings.invocable {
                     self.remove_ship(player_pos);
                     self.player.respawn(true);
                     return;
@@ -121,7 +129,7 @@ impl GameState {
         loop {
             thread::sleep(Duration::from_millis(10));
             self.tick_count += 1;
-            self.ship_actions()?;
+            self.ship_actions(&game_settings)?;
             self.player_actions(&game_settings);
         }
     }

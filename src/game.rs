@@ -15,14 +15,11 @@ use crate::structs::{Cords, COLUMNS, ROWS};
 
 pub struct Game;
 
-
-use bevy::time::Timer;
-
 use crate::game_over::{game_over_enter, gameover_button_system};
+use crate::score_display::{setup_score_ui, update_score_ui};
+use crate::settings_display::spawn_or_update_settings_display;
 
 pub(crate) const TEXT_COLOR: Color = Color::WHITE;
-
-// Add this struct to track the time since the last movement
 
 #[derive(Component)]
 pub(crate) struct ScoreText;
@@ -39,24 +36,24 @@ impl Game {
     pub fn start(&self) {
     let mut game_state = GameState::new();
     let mut game_settings = GameSettings::new();
-    let fly_speed = game_settings.set_fly_speed(Default::default(), 4);
-    pub fn spawn_flies(
-        game_state: &mut GameState,
-        game_settings: &GameSettings,
-        fly_speed: u32,
-        gap: usize,
-    ) {
-        let number_of_flys = game_settings.number_of_flys;
+let fly_speed = game_settings.set_fly_speed(Default::default(), 4);
+pub fn spawn_flies(
+    game_state: &mut GameState,
+    game_settings: &GameSettings,
+    fly_speed: u32,
+    gap: usize,
+) {
+    let number_of_flys = game_settings.number_of_flys;
 
-        for i in 0..COLUMNS {
-            let x = if i % 2 == 0 { 0 } else { 1 };
-            let y = i;
+    for i in 0..COLUMNS {
+        let x = if i % 2 == 0 { 0 } else { 1 };
+        let y = i;
 
-            game_state
-                .game_board
-                .insert(Cords(x, y), Ship::new_fly(fly_speed, game_settings.fly_move, game_settings.laser_shoot));
-        }
+        game_state
+            .game_board
+            .insert(Cords(x, y), Ship::new_fly(fly_speed, game_settings.fly_move, game_settings.laser_shoot));
     }
+}
 
     spawn_flies(&mut game_state, &game_settings, fly_speed, 2);
 
@@ -84,10 +81,14 @@ impl Game {
         .add_systems(Update, gameover_button_system)
         .add_systems(Startup, crate::background::background_setup)
         .add_systems(Update, crate::background::move_and_respawn_stars)
-        .add_systems(Update, Self::settings_display)
+        .add_systems(Update, spawn_or_update_settings_display)
         .add_systems(Startup, Self::startup)
-        //SCORE
-        .add_systems(Update, Self::score_display)
+
+       // .add_systems(Startup, setup_score_ui)
+        //.add_systems(Update, update_score_ui)
+
+        //.add_systems(Update, Game::check_and_spawn_flies)
+
         .add_systems(
             Update,
             Self::keyboard_event_system.distributive_run_if(in_state(GameStateWindows::Playing)),
@@ -100,6 +101,7 @@ impl Game {
             Update,
             (Self::update).distributive_run_if(in_state(GameStateWindows::Playing)),
         )
+       //.add_systems(Update, Game::check_and_spawn_flies)
         .add_systems(OnEnter(GameStateWindows::Menu), Self::menu_enter)
         .add_systems(OnEnter(GameStateWindows::GameOver), game_over_enter)
         .add_systems(OnEnter(GameStateWindows::Playing), |mut commands: Commands| {
@@ -113,7 +115,25 @@ impl Game {
         commands.insert_resource(ClearColor(Color::BLACK));
        // commands.spawn(AudioPlayer::new(asset_server.load("sounds/galaga.ogg")));
     }
+/*
+    pub fn check_and_spawn_flies(
+        &self,
+        mut commands: Commands,
+        mut game_state: ResMut<GameState>,
+        game_settings: Res<GameSettings>,
+    ) {
+        // Check if there are no flies left
+        let flies_remaining = game_state
+            .game_board
+            .values()
+            .any(|ship| matches!(ship, Ship::Fly { .. }));
 
+        if !flies_remaining {
+            let fly_speed = game_settings.set_fly_speed(Default::default(), 4);
+            self.spawn_flies(&mut game_state, &game_settings, fly_speed, 2);
+        }
+    }
+*/
     pub fn update(
         mut commands: Commands,
         mut game_state: ResMut<GameState>,
@@ -186,7 +206,7 @@ impl Game {
 
                         KeyCode::KeyD => {
                             game_settings.invocable = !game_settings.invocable;
-                            println!("Invocable toggled: {}", game_settings.invocable);
+                            println!("invincible toggled: {}", game_settings.invocable);
                         }
 
                         KeyCode::KeyM => {
@@ -247,7 +267,7 @@ impl Game {
                     match button {
                         GamepadButton::North => {
                             game_settings.invocable = !game_settings.invocable;
-                            println!("Invocable toggled (Y): {}", game_settings.invocable);
+                            println!("invincible toggled (Y): {}", game_settings.invocable);
                         }
                         GamepadButton::West => {
                             game_settings.auto_pilot = !game_settings.auto_pilot;
@@ -329,235 +349,6 @@ impl Game {
             });
     }
 
-    //SCORE DISPLAY
-    pub fn score_display(
-        mut commands: Commands,
-        game_state: Res<GameState>,
-        query: Query<Entity, With<ScoreText>>,
-        asset_server: Res<AssetServer>,
-    ) {
-        for entity in query.iter() {
-            commands.entity(entity).despawn_recursive();
-        }
-
-        let score = game_state.score;
-
-        commands
-            .spawn(Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                align_items: AlignItems::FlexStart,
-                justify_content: JustifyContent::FlexStart,
-                ..default()
-            })
-            .with_children(|parent| {
-                parent
-                    .spawn((
-                        Node {
-                            width: Val::Auto,
-                            height: Val::Auto,
-                            margin: UiRect {
-                                left: Val::Px(20.0),
-                                top: Val::Px(20.0),
-                                right: Val::Px(0.0),
-                                bottom: Val::Px(0.0),
-                            },
-                            ..default()
-                        },
-                        ScoreText,
-                    ))
-                    .with_children(|p| {
-                        p.spawn((
-                            Text::new(format!("Score: {}", score)),
-                            TextFont {
-                                font_size: 25.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                    });
-            });
-    }
-
-    //SET SETTINGS
-    // Add settings display logic for ON and OFF
-    pub fn settings_display(
-        mut commands: Commands,
-        query: Query<Entity, With<ScoreText>>,
-        game_settings: Res<GameSettings>,
-    ) {
-        for entity in query.iter() {
-            commands.entity(entity).despawn_recursive();
-        }
-
-        commands.spawn(Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::FlexStart,
-            justify_content: JustifyContent::FlexEnd,
-            ..default()
-        })
-            .with_children(|parent| {
-                // Keyboard settings column
-                parent.spawn(Node {
-                    width: Val::Auto,
-                    height: Val::Percent(100.0),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::FlexStart,
-                    margin: UiRect {
-                        right: Val::Px(20.0),
-                        top: Val::Px(20.0),
-                        ..default()
-                    },
-                    ..default()
-                })
-                    .with_children(|keyboard_section| {
-                        keyboard_section.spawn((
-                            Text::new("Keyboard"),
-                            TextFont {
-                                font_size: 20.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                        keyboard_section.spawn((
-                            Text::new(format!(
-                                "{} :invocable: (D)",
-                                if game_settings.invocable { "ON" } else { "OFF" }
-                            )),
-                            TextFont {
-                                font_size: 15.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                        keyboard_section.spawn((
-                            Text::new(format!(
-                                "{} :auto pilot: (M)",
-                                if game_settings.auto_pilot { "ON" } else { "OFF" }
-                            )),
-                            TextFont {
-                                font_size: 15.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                        keyboard_section.spawn((
-                            Text::new(format!(
-                                "{} :auto shoot: (S)",
-                                if game_settings.auto_shoot { "ON" } else { "OFF" }
-                            )),
-                            TextFont {
-                                font_size: 15.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                        keyboard_section.spawn((
-                            Text::new(format!(
-                                "{} :fly move: (A)",
-                                if game_settings.fly_move { "ON" } else { "OFF" }
-                            )),
-                            TextFont {
-                                font_size: 15.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                        keyboard_section.spawn((
-                            Text::new(format!(
-                                "{} :laser shoot: (W)",
-                                if game_settings.laser_shoot { "ON" } else { "OFF" }
-                            )),
-                            TextFont {
-                                font_size: 15.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                    });
-
-                // Xbox settings column
-                parent.spawn(Node {
-                    width: Val::Auto,
-                    height: Val::Percent(100.0),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::FlexStart,
-                    margin: UiRect {
-                        right: Val::Px(20.0),
-                        top: Val::Px(20.0),
-                        ..default()
-                    },
-                    ..default()
-                })
-                    .with_children(|xbox_section| {
-                        xbox_section.spawn((
-                            Text::new("Xbox"),
-                            TextFont {
-                                font_size: 20.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                        xbox_section.spawn((
-                            Text::new(format!(
-                                "{} :invocable: (Y)",
-                                if game_settings.invocable { "ON" } else { "OFF" }
-                            )),
-                            TextFont {
-                                font_size: 15.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                        xbox_section.spawn((
-                            Text::new(format!(
-                                "{} :auto pilot: (X)",
-                                if game_settings.auto_pilot { "ON" } else { "OFF" }
-                            )),
-                            TextFont {
-                                font_size: 15.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                        xbox_section.spawn((
-                            Text::new(format!(
-                                "{} :auto shoot: (A)",
-                                if game_settings.auto_shoot { "ON" } else { "OFF" }
-                            )),
-                            TextFont {
-                                font_size: 15.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                        xbox_section.spawn((
-                            Text::new(format!(
-                                "{} :fly move: (B)",
-                                if game_settings.fly_move { "ON" } else { "OFF" }
-                            )),
-                            TextFont {
-                                font_size: 15.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                        xbox_section.spawn((
-                            Text::new(format!(
-                                "{} :laser shoot: (D-pad right)",
-                                if game_settings.laser_shoot { "ON" } else { "OFF" }
-                            )),
-                            TextFont {
-                                font_size: 15.0,
-                                ..default()
-                            },
-                            TextColor(TEXT_COLOR),
-                        ));
-                    });
-            });
-    }
 }
 
 #[derive(Resource, Debug)]

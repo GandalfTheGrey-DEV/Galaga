@@ -7,6 +7,8 @@ mod settings;
 mod fly_patterns;
 mod background;
 mod game_over;
+mod settings_display;
+mod score_display;
 
 use game::Game;
 

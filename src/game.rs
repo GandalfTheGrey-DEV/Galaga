@@ -10,10 +10,22 @@ use bevy::window::WindowMode;
 use crate::game_state::GameState;
 use crate::settings::GameSettings;
 use std::default::Default;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use tokio::sync::mpsc;
+use crate::ArduinoAction;
 use crate::ship::Ship;
 use crate::structs::{Cords, COLUMNS, ROWS};
 
-pub struct Game;
+// New resource wrapper for the Arduino receiver
+#[derive(Resource)]
+pub struct ArduinoReceiver {
+    pub receiver: Arc<Mutex<mpsc::Receiver<ArduinoAction>>>
+}
+
+pub struct Game {
+    pub(crate) rx: Arc<Mutex<mpsc::Receiver<ArduinoAction>>>,
+}
 
 use crate::game_over::{game_over_enter, gameover_button_system};
 use crate::score_display::{setup_score_ui, update_score_ui};
@@ -33,107 +45,156 @@ enum GameStateWindows {
 }
 
 impl Game {
-    pub fn start(&self) {
-    let mut game_state = GameState::new();
-    let mut game_settings = GameSettings::new();
-let fly_speed = game_settings.set_fly_speed(Default::default(), 4);
-pub fn spawn_flies(
-    game_state: &mut GameState,
-    game_settings: &GameSettings,
-    fly_speed: u32,
-    gap: usize,
-) {
-    let number_of_flys = game_settings.number_of_flys;
-
-    for i in 0..COLUMNS {
-        let x = if i % 2 == 0 { 0 } else { 1 };
-        let y = i;
-
-        game_state
-            .game_board
-            .insert(Cords(x, y), Ship::new_fly(fly_speed, game_settings.fly_move, game_settings.laser_shoot));
+    pub fn process_arduino_actions(
+        arduino_receiver: Res<ArduinoReceiver>,
+        mut game_state: ResMut<GameState>,
+        game_settings: ResMut<GameSettings>,
+    ) {
+        // Use try_recv() instead of recv() to avoid blocking the game thread
+        if let Ok(mut rx_lock) = arduino_receiver.receiver.lock() {
+            while let Ok(action) = rx_lock.try_recv() {
+                // Receive Arduino action and perform corresponding operations
+                match action {
+                    ArduinoAction::MoveRight => {
+                        println!("Received MoveRight action");
+                        if let Some(Cords(x, y)) = game_state.player.current_position {
+                            if y < COLUMNS - 1 && !game_settings.auto_pilot {
+                                game_state.player.move_to(Cords(x, y + 1));
+                            }
+                        }
+                    }
+                    ArduinoAction::MoveLeft => {
+                        println!("Received MoveLeft action");
+                        if let Some(Cords(x, y)) = game_state.player.current_position {
+                            if y > 0 && !game_settings.auto_pilot {
+                                game_state.player.move_to(Cords(x, y - 1));
+                            }
+                        }
+                    }
+                    ArduinoAction::Shoot => {
+                        println!("Received Shoot action");
+                        if let Some(Cords(x, y)) = game_state.player.current_position {
+                            // Add a new bullet at the player's position
+                            let bullet_position = Cords(x - 1, y);
+                            game_state
+                                .add_ship(bullet_position, Ship::new_bullet(false, 15))
+                                .ok();
+                        }
+                    }
+                }
+            }
+        }
     }
-}
 
-    spawn_flies(&mut game_state, &game_settings, fly_speed, 2);
+    pub fn start(&self) {
+        let mut game_state = GameState::new();
+        let mut game_settings = GameSettings::new();
+        let fly_speed = game_settings.set_fly_speed(Default::default(), 4);
+        pub fn spawn_flies(
+            game_state: &mut GameState,
+            game_settings: &GameSettings,
+            fly_speed: u32,
+            gap: usize,
+        ) {
+
+            let number_of_flys = game_settings.number_of_flys;
+
+            for i in 0..COLUMNS {
+                let x = if i % 2 == 0 { 0 } else { 1 };
+                let y = i;
+
+                game_state
+                    .game_board
+                    .insert(Cords(x, y), Ship::new_fly(fly_speed, game_settings.fly_move, game_settings.laser_shoot));
+            }
+        }
+
+        spawn_flies(&mut game_state, &game_settings, fly_speed, 2);
 
         let mut app = App::new();
-    app.add_plugins(
-        DefaultPlugins
-            .set(LogPlugin {
-                level: Level::DEBUG,
-                filter: "wgpu=error".to_string(),
-                ..default()
-            })
-            .set(WindowPlugin {
-                primary_window: Some(Window {
-                    resizable: false,
-                    mode: WindowMode::Windowed,
+        app.add_plugins(
+            DefaultPlugins
+                .set(LogPlugin {
+                    level: Level::DEBUG,
+                    filter: "wgpu=error".to_string(),
+                    ..default()
+                })
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        resizable: false,
+                        mode: WindowMode::Windowed,
+                        ..default()
+                    }),
                     ..default()
                 }),
-                ..default()
-            }),
-    )
-        .insert_resource(game_state)
-        .insert_resource(Grid::new(50.0))
-        .insert_resource(GameSettings::new())
-        .init_state::<GameStateWindows>()
-        .add_systems(Update, gameover_button_system)
-        .add_systems(Startup, crate::background::background_setup)
-        .add_systems(Update, crate::background::move_and_respawn_stars)
-        .add_systems(Update, spawn_or_update_settings_display)
-        .add_systems(Startup, Self::startup)
-
-       // .add_systems(Startup, setup_score_ui)
-        //.add_systems(Update, update_score_ui)
-
-        //.add_systems(Update, Game::check_and_spawn_flies)
-
-        .add_systems(
-            Update,
-            Self::keyboard_event_system.distributive_run_if(in_state(GameStateWindows::Playing)),
         )
-        .add_systems(
-            Update,
-            Self::gamepad_event_system.distributive_run_if(in_state(GameStateWindows::Playing)),
-        )
-        .add_systems(
-            Update,
-            (Self::update).distributive_run_if(in_state(GameStateWindows::Playing)),
-        )
-       //.add_systems(Update, Game::check_and_spawn_flies)
-        .add_systems(OnEnter(GameStateWindows::Menu), Self::menu_enter)
-        .add_systems(OnEnter(GameStateWindows::GameOver), game_over_enter)
-        .add_systems(OnEnter(GameStateWindows::Playing), |mut commands: Commands| {
-            commands.insert_resource(ClearColor(TEXT_COLOR));
-        })
-        .run();
-}
+            .insert_resource(game_state)
+            .insert_resource(Grid::new(50.0))
+            .insert_resource(GameSettings::new())
+            // Insert the Arduino receiver as a proper resource
+            .insert_resource(ArduinoReceiver {
+                receiver: self.rx.clone()
+            })
+            .init_state::<GameStateWindows>()
+            .add_systems(Update, gameover_button_system)
+            .add_systems(Startup, crate::background::background_setup)
+            .add_systems(Update, crate::background::move_and_respawn_stars)
+            .add_systems(Update, spawn_or_update_settings_display)
+            .add_systems(Startup, Self::startup)
+
+            .add_systems(Startup, setup_score_ui)
+            .add_systems(Update, update_score_ui)
+
+            //.add_systems(Update, Game::check_and_spawn_flies)
+
+            // Add the system to process Arduino actions
+            .add_systems(Update, Self::process_arduino_actions)
+
+            .add_systems(
+                Update,
+                Self::keyboard_event_system.distributive_run_if(in_state(GameStateWindows::Playing)),
+            )
+            .add_systems(
+                Update,
+                Self::gamepad_event_system.distributive_run_if(in_state(GameStateWindows::Playing)),
+            )
+            .add_systems(
+                Update,
+                (Self::update).distributive_run_if(in_state(GameStateWindows::Playing)),
+            )
+            //.add_systems(Update, Game::check_and_spawn_flies)
+            .add_systems(OnEnter(GameStateWindows::Menu), Self::menu_enter)
+            .add_systems(OnEnter(GameStateWindows::GameOver), game_over_enter)
+            .add_systems(OnEnter(GameStateWindows::Playing), |mut commands: Commands| {
+                commands.insert_resource(ClearColor(TEXT_COLOR));
+            })
+            .run();
+    }
 
     pub fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
         commands.spawn(Camera2dBundle::default());
         commands.insert_resource(ClearColor(Color::BLACK));
-       // commands.spawn(AudioPlayer::new(asset_server.load("sounds/galaga.ogg")));
+        // commands.spawn(AudioPlayer::new(asset_server.load("sounds/galaga.ogg")));
     }
-/*
-    pub fn check_and_spawn_flies(
-        &self,
-        mut commands: Commands,
-        mut game_state: ResMut<GameState>,
-        game_settings: Res<GameSettings>,
-    ) {
-        // Check if there are no flies left
-        let flies_remaining = game_state
-            .game_board
-            .values()
-            .any(|ship| matches!(ship, Ship::Fly { .. }));
+    /*
+        pub fn check_and_spawn_flies(
+            &self,
+            mut commands: Commands,
+            mut game_state: ResMut<GameState>,
+            game_settings: Res<GameSettings>,
+        ) {
+            // Check if there are no flies left
+            let flies_remaining = game_state
+                .game_board
+                .values()
+                .any(|ship| matches!(ship, Ship::Fly { .. }));
 
-        if !flies_remaining {
-            let fly_speed = game_settings.set_fly_speed(Default::default(), 4);
-            self.spawn_flies(&mut game_state, &game_settings, fly_speed, 2);
+            if !flies_remaining {
+                let fly_speed = game_settings.set_fly_speed(Default::default(), 4);
+                self.spawn_flies(&mut game_state, &game_settings, fly_speed, 2);
+            }
         }
-    }
-*/
+    */
     pub fn update(
         mut commands: Commands,
         mut game_state: ResMut<GameState>,
@@ -352,7 +413,6 @@ pub fn spawn_flies(
 }
 
 #[derive(Resource, Debug)]
-
 struct Grid {
     cell_size: f32,
     entities: Vec<(String, (usize, usize))>,

@@ -53,8 +53,7 @@ pub fn spawn_or_update_settings_display(
             );
         });
 }
-//TODO make grid smaller
-//TODO fix name on invocalbe
+
 fn spawn_settings_column(
     parent: &mut ChildBuilder,
     title: &str,
